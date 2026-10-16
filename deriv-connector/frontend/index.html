@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Deriv Connector Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 2rem; }
+    #messages { border: 1px solid #ddd; padding: 1rem; height: 300px; overflow: auto; background: #fafafa }
+    form { margin-top: 1rem }
+    textarea { width: 100%; height: 80px }
+  </style>
+</head>
+<body>
+  <h1>Deriv Connector Demo</h1>
+  <div id="messages"></div>
+
+  <form id="sendForm">
+    <label>JSON payload to send to Deriv:</label>
+    <textarea id="payload">{"ticks":"R_100"}</textarea>
+    <button type="submit">Send</button>
+  </form>
+
+  <script>
+    const messages = document.getElementById('messages');
+    function log(msg) {
+      const d = document.createElement('div');
+      d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      messages.appendChild(d);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    // SSE stream
+    const sse = new EventSource('/stream');
+    sse.onmessage = (e) => {
+      log('SSE: ' + e.data);
+    };
+    sse.onerror = (e) => {
+      log('SSE connection error');
+    };
+
+    // Send form
+    document.getElementById('sendForm').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      let p = document.getElementById('payload').value;
+      try { p = JSON.parse(p); } catch (err) { alert('Invalid JSON'); return; }
+
+      try {
+        const resp = await fetch('/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(p),
+        });
+        const j = await resp.json();
+        log('Send response: ' + JSON.stringify(j));
+      } catch (err) {
+        log('Send failed: ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

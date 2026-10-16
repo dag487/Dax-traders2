@@ -1,17 +1,50 @@
 /*
-  Simple Deriv websocket connector exposing an HTTP send endpoint and an SSE stream for inbound messages.
+  Deriv web connector with basic security and rate limiting.
 */
 
 const express = require('express');
 const WebSocket = require('ws');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
+app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || process.env.PORT || 3000;
+// Basic auth middleware (optional) using BASIC_AUTH_USER and BASIC_AUTH_PASS
+function basicAuth(req, res, next) {
+  const user = process.env.BASIC_AUTH_USER;
+  const pass = process.env.BASIC_AUTH_PASS;
+  if (!user || !pass) return next();
+
+  const auth = req.headers['authorization'];
+  if (!auth || !auth.startsWith('Basic ')) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Restricted"');
+    return res.status(401).send('Authentication required');
+  }
+  const creds = Buffer.from(auth.split(' ')[1], 'base64').toString();
+  const [u, p] = creds.split(':');
+  if (u === user && p === pass) return next();
+
+  res.setHeader('WWW-Authenticate', 'Basic realm="Restricted"');
+  return res.status(401).send('Invalid credentials');
+}
+
+// Rate limiter
+const limiter = rateLimit({
+  windowMs: (parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10)), // default 1 minute
+  max: parseInt(process.env.RATE_LIMIT_MAX || '60', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(limiter);
+app.use(basicAuth);
+
+const PORT = process.env.PORT || 3000;
 const DERIV_WS_URL = process.env.DERIV_WS_URL || 'wss://ws.binaryws.com/websockets/v3?app_id=1089';
 const DERIV_API_TOKEN = process.env.DERIV_API_TOKEN || null;
 
@@ -62,7 +95,6 @@ function connect() {
 
   ws.on('error', (err) => {
     console.error('Deriv WS error:', err && err.message ? err.message : err);
-    // ws will emit close after error in many cases; ensure reconnect
     if (ws && ws.readyState !== WebSocket.OPEN) {
       scheduleReconnect();
     }

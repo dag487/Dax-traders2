@@ -1,17 +1,10 @@
-# Deriv Web Connector
+Updated README: added Dockerfile, serverless notes, frontend demo, and security guidance.
 
-This simple Node.js connector proxies messages to/from the Deriv WebSocket API and exposes:
+Usage additions:
+- Build with Docker: docker build -t deriv-connector deriv-connector/ && docker run -p 3000:3000 --env-file deriv-connector/.env deriv-connector
+- Vercel: deploy `deriv-connector/vercel` as a Serverless Function. Note: streaming /stream cannot work on serverless; use the long-lived Node server in this repo for that feature.
+- Frontend: open deriv-connector/frontend/index.html while the connector is running and visit http://localhost:3000
 
-- HTTP POST /send — send arbitrary JSON to Deriv
-- GET /stream — Server-Sent Events (SSE) stream of messages from Deriv
-
-Usage
-
-1. Copy `.env.example` to `.env` and set DERIV_WS_URL or DERIV_API_TOKEN as needed.
-2. npm install
-3. npm start
-
-Notes
-
-- If you provide DERIV_API_TOKEN the connector will send an `authorize` message after connecting.
-- The default public endpoint uses app_id 1089 for unauthenticated requests.
+Security notes:
+- Enable BASIC_AUTH_USER and BASIC_AUTH_PASS in .env to require basic auth for HTTP endpoints.
+- RATE_LIMIT_MAX and RATE_LIMIT_WINDOW_MS provide simple rate limiting.
